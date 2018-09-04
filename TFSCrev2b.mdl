@@ -1,0 +1,839 @@
+{UTF-8}
+initial car ownership fraction  = 0.7
+	~	Dmnl [0,1,0.05]
+	~		|
+
+Possibility to use[public transport,public transport]  = 1 ~~|
+Possibility to use[public transport,regular car]  = 0 ~~|
+Possibility to use[public transport,electric car]  = 0 ~~|
+Possibility to use[regular car,public transport]  = 1 ~~|
+Possibility to use[regular car,regular car]  = 1 ~~|
+Possibility to use[regular car,electric car]  = 0 ~~|
+Possibility to use[electric car,public transport]  = 1 ~~|
+Possibility to use[electric car,regular car]  = 0 ~~|
+Possibility to use[electric car,electric car]  = 1
+	~	Dmnl
+	~		|
+
+x : public transport,regular car,electric car
+	~	
+	~		|
+
+y <-> x
+	~	
+	~		|
+
+z <-> y
+	~	
+	~		|
+
+********************************************************
+	.Control
+********************************************************~
+		Simulation Control Parameters
+	|
+
+FINAL TIME  = 2050
+	~	Year
+	~	The final time for the simulation.
+	|
+
+INITIAL TIME  = 2010
+	~	Year
+	~	The initial time for the simulation.
+	|
+
+SAVEPER  = 
+        TIME STEP
+	~	Year [0,?]
+	~	The frequency with which output is stored.
+	|
+
+TIME STEP  = 0.125
+	~	Year [0,?]
+	~	The time step for the simulation.
+	|
+
+********************************************************
+	.infra
+********************************************************~
+	|
+
+Biofuel Availability  = 
+        SMOOTH3I ( IF THEN ELSE ( Time 
+                       > Policy Time infra , 
+                  POLICY BIOFUEL CAPACITY , 
+                  0) , 
+             DELAY BIOFUEL , 
+             0)
+	~	Dmnl
+	~		|
+
+Biofuel price index  = 1
+	~	€/Trip [0.5,1.5,0.1]
+	~		|
+
+DELAY BIOFUEL  = 30
+	~	Year
+	~	Biofuel capacity construction time
+	|
+
+DELAY INFRA CONSTRUCTION[x]  = 10
+	~	Year
+	~		|
+
+exo infra init[x]  = 0.5, 1, 0
+	~	Dmnl [?,?,0.1]
+	~		|
+
+exogenous infra[x]  = 
+        SMOOTH3I ( new infra[x] 
+                  + exo infra init[x] , 
+             DELAY INFRA CONSTRUCTION[x] , 
+             exo infra init[x] )
+	~	Dmnl
+	~		|
+
+new infra[public transport]  = 
+        IF THEN ELSE ( Time 
+                  > Policy Time infra , 
+             POLICY PUBLIC INFRA , 
+             0) ~~|
+new infra[regular car]  = 0 ~~|
+new infra[electric car]  = 
+        IF THEN ELSE ( Time 
+                  > Policy Time infra , 
+             POLICY ELECTRIC INFRA , 
+             0)
+	~	Dmnl
+	~		|
+
+OIL PRICE GROWTH RATE  = 0.02
+	~	1/Year [0,0.05,0.01]
+	~		|
+
+Oil price index  = 
+        INTEG( Oil price index 
+                  * OIL PRICE GROWTH RATE , 
+             1)
+	~	€/Trip
+	~		|
+
+PriceIndex  = 
+        ( Biofuel Availability 
+             * Biofuel price index 
+             + ( 1
+                  - Biofuel Availability ) 
+                  * Oil price index )
+	~	€/Trip
+	~	The price index in the future for conventional cars. Oil price is assumed \
+		to rise. Biofuel is assumed to be cheaper, but its availabity limits its \
+		use.
+	|
+
+********************************************************
+	.platform
+********************************************************~
+	|
+
+Car Lifetime  = 10
+	~	Year [5,20,1]
+	~		|
+
+DELAY USAGE CHANGE  = 2
+	~	Year [0.25,5,1]
+	~		|
+
+initial car ownership fraction0  = 
+        IF THEN ELSE ( MAX POPULATION FRACTION WITH NO PUBLIC TRANSPORT 
+                  = 1
+                  :OR: INIT PUBLIC WTC AMONG CAR USERS 
+                       = 0, 
+             1, 
+             sigma switch from platform[public transport,regular car] 
+                  / sigma switch from platform[regular car,public transport] 
+                  * lambda[regular car] 
+                  / lambda[public transport] 
+                  / ( 1
+                       + sigma switch from platform[public transport,regular car] 
+                            / sigma switch from platform[regular car,public transport\
+		] 
+                            * lambda[regular car] 
+                            / lambda[public transport] ) )
+	~	Dmnl
+	~	equilibrium value (if wtc were constant): stock2/stock1 = \
+		sigma[1,2]/sigma[2,1] * lambda2/lambda1 => stock2/(stock1+stock2) = \
+		sigma[1,2]/sigma[2,1] * lambda2/lambda1 / (1+ sigma[1,2]/sigma[2,1] * \
+		lambda2/lambda1. IF THEN ELSE -> avoids division by zero
+	~	:SUPPLEMENTARY 
+	|
+
+initial ownership fraction[public transport]  = 
+        1
+             - initial car ownership fraction ~~|
+initial ownership fraction[regular car]  = 
+        initial car ownership fraction ~~|
+initial ownership fraction[electric car]  = 0
+	~	Dmnl
+	~		|
+
+lambda[public transport]  = 
+        Public transport decision interval ~~|
+lambda[regular car]  = 
+        Car Lifetime ~~|
+lambda[electric car]  = 
+        Car Lifetime
+	~	Year
+	~		|
+
+Owner Fraction[x]  = 
+        Owners[x] 
+             / sum ( Owners[x!] )
+	~	Dmnl
+	~		|
+
+Owners[x]  = 
+        INTEG( - sum ( sigma switch from platform[x,y!] 
+                       * Owners[x] 
+                       / lambda[x] ) 
+                  + sum ( sigma switch from platform[y!,x] 
+                            * Owners[y!] 
+                            / lambda[y!] ) 
+                  + POPULATION INCREASE SLOPE 
+                       * Owner Fraction[x] , 
+             initial population 
+                  * initial ownership fraction[x] )
+	~	Person
+	~		|
+
+Public transport decision interval  = 10
+	~	Year
+	~		|
+
+Trip Fraction[x]  = 
+        Trips[x] 
+             / sum ( Trips[x!] )
+	~	Dmnl
+	~		|
+
+Trips[y]  = 
+        smooth ( sum ( Owners[x!] 
+                       * sigma switch use[x!,y] 
+                       * TRIPS PER PERSON ) , 
+             DELAY USAGE CHANGE )
+	~	Trip/Day
+	~		|
+
+Trips By Car init  = 
+        INITIAL( TripsByCar  )
+	~	Trips/Day
+	~		|
+
+TripsByCar  = 
+        Trips[regular car] 
+             + Trips[electric car]
+	~	Trips/Day
+	~		|
+
+********************************************************
+	.policy
+********************************************************~
+	|
+
+POLICY BIOFUEL CAPACITY  = 0
+	~	Dmnl [0,1,0.1]
+	~		|
+
+POLICY ELECTRIC COST SUBSIDY  = 0
+	~	Dmnl [0,1,1]
+	~		|
+
+POLICY ELECTRIC INFRA  = 0
+	~	Dmnl [0,2,0.1]
+	~		|
+
+POLICY INCREASE ROAD CAPACITY  = 1
+	~	Dmnl [0,1,1]
+	~		|
+
+POLICY MARKETING DURATION ELECTRIC  = 0
+	~	Year [0,50,1]
+	~		|
+
+POLICY MARKETING DURATION PUBLIC  = 0
+	~	Year [0,10,1]
+	~		|
+
+POLICY PUBLIC COST SUBSIDY  = 0
+	~	Dmnl [0,1,1]
+	~		|
+
+POLICY PUBLIC INFRA  = 0
+	~	Dmnl [0,1,0.1]
+	~		|
+
+Policy Time Cost  = 2012
+	~	Year
+	~		|
+
+Policy Time infra  = 2012
+	~	Year
+	~		|
+
+Policy Time marketing  = 2012
+	~	Year [2010,2015]
+	~		|
+
+********************************************************
+	.population
+********************************************************~
+	|
+
+DELAY POPULATION MOVEMENT  = 20
+	~	Year [5,50,5]
+	~		|
+
+initial population  = 1.36e+006
+	~	Person
+	~		|
+
+MAX POPULATION FRACTION WITH NO PUBLIC TRANSPORT  = 0.8
+	~	Dmnl [0,1,0.1]
+	~		|
+
+POPULATION INCREASE SLOPE  = 11900
+	~	Person/Year [0,20000,100]
+	~		|
+
+TRIPS PER PERSON  = 2.8
+	~	Trips/(Person*Day)
+	~		|
+
+********************************************************
+	.road
+********************************************************~
+	|
+
+DELAY ROAD INFRA  = 5
+	~	Year [5,20,1]
+	~		|
+
+Road infra  = 
+        SMOOTH3 ( IF THEN ELSE ( POLICY INCREASE ROAD CAPACITY 
+                       > 0.5
+                       :OR: Time 
+                            < Policy Time infra , 
+                  TripsByCar , 
+                  min ( TripsByCar , 
+                       Trips By Car init ) ) , 
+             DELAY ROAD INFRA )
+	~	Trip/Day
+	~		|
+
+Road Infra Adequacy  = 
+        IF THEN ELSE ( TripsByCar 
+                  > Road infra , 
+             ( Road infra 
+                  / TripsByCar ) 
+                  ^ SENSITIVITY CONGESTION , 
+             1)
+	~	Dmnl
+	~		|
+
+SENSITIVITY CONGESTION  = 6
+	~	Dmnl
+	~		|
+
+********************************************************
+	.utility
+********************************************************~
+	|
+
+a long[x]  = 
+        ( Cost[x] 
+             / REF COST ) 
+             ^ - ALPHA 
+             * ( Performance[x] 
+                  / REF PERFORMANCE ) 
+                  ^ ALPHA
+	~	Dmnl
+	~		|
+
+a short[x]  = 
+        ( Cost use[x] 
+             / REF USE COST ) 
+             ^ - ALPHA 
+             * ( Performance[x] 
+                  / REF PERFORMANCE ) 
+                  ^ ALPHA
+	~	Dmnl
+	~		|
+
+ALPHA  = 1
+	~	Dmnl [0.1,1,0.1]
+	~		|
+
+Cost[public transport]  = 0.5 ~~|
+Cost[regular car]  = 1 ~~|
+Cost[electric car]  = 
+        IF THEN ELSE ( POLICY ELECTRIC COST SUBSIDY 
+                  > 0.5
+                  :AND: Time 
+                       > Policy Time Cost , 
+             0.5, 
+             2)
+	~	€
+	~		|
+
+Cost use[public transport]  = 
+        IF THEN ELSE ( POLICY PUBLIC COST SUBSIDY 
+                  > 0.5
+                  :AND: Time 
+                       > Policy Time Cost , 
+             0.8, 
+             1.2) ~~|
+Cost use[regular car]  = 
+        PriceIndex ~~|
+Cost use[electric car]  = 0.2
+	~	€/Trip
+	~		|
+
+initial performance[public transport]  = 
+        exo infra init[public transport] 
+             * ( 1
+                  - MAX POPULATION FRACTION WITH NO PUBLIC TRANSPORT ) ~~|
+initial performance[regular car]  = 
+        exo infra init[regular car] ~~|
+initial performance[electric car]  = 
+        exo infra init[electric car]
+	~	Dmnl
+	~		|
+
+Performance[x]  = 
+        DELAY FIXED ( Performance1[x] ,TIME STEP , 
+             initial performance[x] )
+	~	Dmnl
+	~		|
+
+Performance1[public transport]  = 
+        ( 1
+             - Population fraction with no public transport ) 
+             * exogenous infra[public transport] ~~|
+Performance1[regular car]  = 
+        Road Infra Adequacy ~~|
+Performance1[electric car]  = 
+        Road Infra Adequacy 
+             * exogenous infra[electric car]
+	~	Dmnl
+	~		|
+
+Population fraction with no public transport  = 
+        smooth ( MAX POPULATION FRACTION WITH NO PUBLIC TRANSPORT 
+                  * Road Infra Adequacy , 
+             DELAY POPULATION MOVEMENT )
+	~	Dmnl
+	~		|
+
+REF COST  = 1
+	~	€
+	~		|
+
+REF PERFORMANCE  = 1
+	~	Dmnl
+	~		|
+
+REF USE COST  = 1
+	~	€/Trip
+	~		|
+
+sigma switch from platform[x,y]  = 
+        zidz ( WtC[x,y] 
+                  * a long[y] , 
+             sum ( WtC[x,y!] 
+                       * a long[y!] ) )
+	~	Dmnl
+	~		|
+
+sigma switch use[x,y]  = 
+        zidz ( WtC[x,y] 
+                  * a short[y] 
+                  * Possibility to use[x,y] , 
+             sum ( WtC[x,y!] 
+                       * a short[y!] 
+                       * Possibility to use[x,y!] ) )
+	~	Dmnl
+	~		|
+
+********************************************************
+	.wtc
+********************************************************~
+	|
+
+CONTACT RATE DIRECT  = 0.25
+	~	1/Year [0,1,0.05]
+	~		|
+
+CONTACT RATE INDIRECT  = 0.15
+	~	1/Year [0,1,0.005]
+	~		|
+
+ContactRate[x,y,z]  = 
+        IF THEN ELSE ( x
+                  = y, 
+             1, 
+             IF THEN ELSE ( y
+                       = z, 
+                  CONTACT RATE DIRECT , 
+                  CONTACT RATE INDIRECT ) )
+	~	1/Year
+	~	frequency and effectiveness of contacts between drivers of platforms i and \
+		j
+	|
+
+Epsilon  = 
+        1
+             / ( 2
+                  * ExposureRef )
+	~	Year
+	~	slope of WtC decay rate at reference rate
+	|
+
+Exposure[x,y]  = 
+        Marketing[y] 
+             + WOM[x,y]
+	~	1/Year
+	~	Impact of total social exposure on the increase of familiarity
+	|
+
+ExposureRef  = 0.05
+	~	1/Year [0,0.2,0.01]
+	~	reference rate of social exposure
+	|
+
+INIT ELECTRIC CAR WTC  = 0.6
+	~	Dmnl [0,1,0.1]
+	~		|
+
+INIT PUBLIC WTC AMONG CAR USERS  = 0.6
+	~	Dmnl [0,1,0.05]
+	~		|
+
+Marketing[public transport]  = 
+        IF THEN ELSE ( Time 
+                  > Policy Time marketing 
+                  :AND: Time 
+                       < INITIAL TIME 
+                            + POLICY MARKETING DURATION PUBLIC , 
+             MARKETING EFFECTIVENESS , 
+             0) ~~|
+Marketing[regular car]  = 0 ~~|
+Marketing[electric car]  = 
+        IF THEN ELSE ( Time 
+                  > Policy Time marketing 
+                  :AND: Time 
+                       < INITIAL TIME 
+                            + POLICY MARKETING DURATION ELECTRIC , 
+             MARKETING EFFECTIVENESS , 
+             0)
+	~	1/Year
+	~	effectiveness of marketing and promotion for platform j
+	|
+
+MARKETING EFFECTIVENESS  = 0.025
+	~	1/Year [0.01,0.03,0.01]
+	~		|
+
+MaxDecay  = 1
+	~	1/Year [0,1]
+	~	maximum WtC loss rate
+	|
+
+WOM[x,y]  = 
+        sum ( ContactRate[x,y,z!] 
+                  * WtC[z!,y] 
+                  * Trip Fraction[z!] )
+	~	1/Year
+	~		|
+
+WtC[x,y]  = 
+        INTEG( Exposure[x,y] 
+                  * ( 1
+                       - WtC[x,y] ) 
+                  - WtC decay[x,y] 
+                       * WtC[x,y] , 
+             WtC init[x,y] )
+	~	Dmnl
+	~	Willingness to consider private cars or public transport
+	|
+
+WtC decay[x,y]  = 
+        MaxDecay 
+             * exp ( -4
+                       * Epsilon 
+                       * ( Exposure[x,y] 
+                            - ExposureRef ) ) 
+             / ( 1
+                  + exp ( -4
+                            * Epsilon 
+                            * ( Exposure[x,y] 
+                                 - ExposureRef ) ) )
+	~	1/Year
+	~	Average fractional decay of willingness to consider platform j among \
+		drivers of platform i
+	|
+
+WtC init[public transport,public transport]  = 1 ~~|
+WtC init[public transport,regular car]  = 1 ~~|
+WtC init[public transport,electric car]  = 
+        INIT ELECTRIC CAR WTC ~~|
+WtC init[regular car,public transport]  = 
+        INIT PUBLIC WTC AMONG CAR USERS ~~|
+WtC init[regular car,regular car]  = 1 ~~|
+WtC init[regular car,electric car]  = 
+        INIT ELECTRIC CAR WTC ~~|
+WtC init[electric car,public transport]  = 
+        INIT PUBLIC WTC AMONG CAR USERS ~~|
+WtC init[electric car,regular car]  = 1 ~~|
+WtC init[electric car,electric car]  = 1
+	~	Dmnl [0,1]
+	~	Initial value for willingness to consider
+	|
+
+\\\---/// Sketch information - do not modify anything except names
+V300  Do not put anything below this section - it will be ignored
+*Model
+$192-192-192,0,@Arial Unicode MS|10||0-0-0|0-0-0|0-0-0|-1--1--1|-1--1--1|120,120,85,0
+10,1,Trip Fraction,540,590,46,12,8,131,0,0,0,0,0,0
+10,2,TripsByCar,682,452,42,12,8,3,0,0,0,0,0,0
+10,3,Road Infra Adequacy,873,466,40,21,8,131,0,0,0,0,0,0
+1,4,2,3,1,0,0,0,0,64,0,-1--1--1,,1|(817,481)|
+10,5,Car Lifetime,299,532,44,12,8,3,1,0,-1,0,0,0
+10,6,TRIPS PER PERSON,470,527,45,26,8,131,2,4,0,0,0,0,-1--1--1,255-255-128,|10||0-0-0
+10,7,Owner Fraction,434,385,56,12,8,131,1,0,0,0,0,0
+10,8,Performance,1103,583,48,12,8,3,0,0,-1,0,0,0
+10,9,Performance1,1051,529,52,12,8,131,0,0,0,0,0,0
+1,10,9,8,0,0,0,0,0,64,0,-1--1--1,,1|(1071,550)|
+10,11,Public transport decision interval,259,482,59,21,8,3,1,0,-1,0,0,0
+10,12,Trips,568,449,20,12,8,3,0,0,0,0,0,0
+1,13,12,1,0,0,0,0,0,64,0,-1--1--1,,1|(555,512)|
+10,14,Owners,461,448,40,20,3,3,0,0,0,0,0,0
+10,15,lambda,374,488,28,12,8,3,1,0,-1,0,0,0
+1,16,15,14,0,1,0,0,0,64,0,-1--1--1,,1|(404,474)|
+1,17,14,12,0,0,0,0,0,64,0,-1--1--1,,1|(517,448)|
+1,18,14,7,0,1,0,0,0,64,0,-1--1--1,,1|(448,418)|
+10,19,DELAY USAGE CHANGE,584,393,61,21,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+1,20,19,12,0,2,0,0,0,64,0,-1--1--1,,1|(576,418)|
+10,21,INIT ELECTRIC CAR WTC,710,883,62,21,8,3,0,4,-1,0,0,0,-1--1--1,255-255-128,|10||0-0-0
+10,22,INIT PUBLIC WTC AMONG CAR USERS,559,887,84,21,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+1,23,11,15,0,1,0,0,0,64,0,-1--1--1,,1|(325,485)|
+1,24,5,15,0,1,0,0,0,64,0,-1--1--1,,1|(329,513)|
+1,25,6,12,0,2,0,0,0,64,0,-1--1--1,,1|(521,485)|
+1,26,12,2,0,0,0,0,0,64,0,-1--1--1,,1|(607,449)|
+1,27,3,9,1,0,0,0,0,64,0,-1--1--1,,1|(952,485)|
+10,28,Population fraction with no public transport,987,416,85,21,8,131,0,0,0,0,0,0
+1,29,3,28,1,0,0,0,0,64,0,-1--1--1,,1|(930,457)|
+10,30,MAX POPULATION FRACTION WITH NO PUBLIC TRANSPORT,814,359,87,31,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+1,31,30,28,1,2,0,0,0,64,0,-1--1--1,,1|(889,426)|
+10,32,DELAY POPULATION MOVEMENT,989,349,56,31,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+1,33,32,28,1,2,0,0,0,64,0,-1--1--1,,1|(984,379)|
+10,34,Road infra,750,505,39,12,8,3,0,0,0,0,0,0
+1,35,34,3,0,0,0,0,0,64,0,-1--1--1,,1|(803,487)|
+10,36,DELAY ROAD INFRA,651,540,56,21,8,131,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+1,37,36,34,0,2,0,0,0,64,0,-1--1--1,,1|(705,521)|
+10,38,initial performance,1202,469,47,21,8,3,2,0,-1,0,0,0
+1,39,38,8,0,0,0,0,0,64,1,-1--1--1,,1|(1153,525)|
+10,40,TIME STEP,1206,533,54,12,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|8||128-128-128
+1,41,40,8,1,0,0,0,0,64,0,-1--1--1,,1|(1163,565)|
+12,42,3278970,1578,424,234,178,3,188,0,0,2,0,0,0
+WtC[x,y],Graph
+10,43,POLICY INCREASE ROAD CAPACITY,814,569,50,34,8,131,2,4,0,0,0,0,-1--1--1,128-192-255,|8||0-0-0
+10,44,Trips By Car init,651,487,58,12,8,3,0,0,0,0,0,0
+1,45,2,44,0,0,0,0,0,64,1,-1--1--1,,1|(671,464)|
+10,46,SENSITIVITY CONGESTION,708,397,58,21,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+1,47,46,3,0,2,0,0,0,64,0,-1--1--1,,1|(789,430)|
+1,48,43,34,0,2,0,0,0,64,0,-1--1--1,,1|(775,530)|
+1,49,2,34,0,0,0,0,0,64,0,-1--1--1,,1|(709,474)|
+1,50,44,34,0,0,0,0,0,64,0,-1--1--1,,1|(703,497)|
+1,51,7,14,0,1,0,0,0,64,0,-1--1--1,,1|(442,406)|
+10,52,POPULATION INCREASE SLOPE,320,419,75,21,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+10,53,WtC,566,786,45,25,3,131,0,0,0,0,0,0
+10,54,Exposure,498,734,36,12,8,131,0,0,-1,0,0,0
+10,55,WtC decay,453,786,41,12,8,131,0,0,-1,0,0,0
+10,56,ContactRate,401,647,47,12,8,3,0,0,0,0,0,0
+10,57,Marketing,395,728,37,12,8,3,0,0,0,0,0,0
+10,58,ExposureRef,367,873,49,12,8,3,0,0,0,0,0,0
+10,59,Epsilon,348,818,28,12,8,3,0,0,0,0,0,0
+1,60,58,59,1,0,0,0,1,64,0,0-0-0,|12||0-0-0,1|(354,843)|
+10,61,MaxDecay,459,847,29,16,8,131,0,0,0,0,0,0
+10,62,WOM,566,686,22,12,8,131,0,0,0,0,0,0
+1,63,56,62,1,0,0,0,1,64,0,0-0-0,|12||0-0-0,1|(489,643)|
+1,64,53,62,1,0,0,0,3,64,0,0-0-0,|12||0-0-0,1|(595,743)|
+1,65,61,55,1,0,0,0,1,64,0,0-0-0,|12||0-0-0,1|(464,822)|
+10,66,WtC init,585,834,29,12,8,131,0,0,-1,0,0,0
+1,67,62,54,1,0,0,0,3,64,0,0-0-0,|12||0-0-0,1|(529,706)|
+10,68,POLICY MARKETING DURATION PUBLIC,130,704,85,21,8,131,2,4,-1,0,0,0,-1--1--1,128-192-255,|8|BU|255-128-0
+1,69,68,57,1,2,0,0,3,64,0,0-0-0,|12||0-0-0,1|(266,707)|
+1,70,66,53,0,0,0,0,1,64,1,0-0-0,|12||0-0-0,1|(581,822)|
+10,71,POLICY MARKETING DURATION ELECTRIC,114,819,91,21,8,131,2,4,-1,0,0,0,-1--1--1,128-192-255,|8|BU|255-128-0
+1,72,71,57,0,2,0,0,1,64,0,0-0-0,|12||0-0-0,1|(261,770)|
+10,73,CONTACT RATE DIRECT,289,638,67,21,8,131,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||255-128-0
+10,74,CONTACT RATE INDIRECT,422,619,67,21,8,131,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||255-128-0
+1,75,73,56,1,2,0,0,1,64,0,0-0-0,|12||0-0-0,1|(340,636)|
+1,76,74,56,0,2,0,0,1,64,0,0-0-0,|12||0-0-0,1|(412,631)|
+1,77,57,54,0,0,0,0,3,64,0,0-0-0,|12||0-0-0,1|(440,730)|
+10,78,Time,401,690,29,12,8,2,0,0,-1,0,0,0
+1,79,78,57,0,0,0,0,3,64,0,0-0-0,|12||0-0-0,1|(399,702)|
+1,80,54,53,0,0,0,0,1,64,0,0-0-0,|12||0-0-0,1|(517,749)|
+1,81,55,53,0,0,0,0,1,64,0,0-0-0,|12||0-0-0,1|(500,786)|
+1,82,59,55,0,0,0,0,0,64,0,-1--1--1,,1|(387,806)|
+1,83,54,55,0,0,0,0,0,64,0,-1--1--1,,1|(480,754)|
+1,84,58,55,0,0,0,0,0,64,0,-1--1--1,,1|(404,834)|
+10,85,MARKETING EFFECTIVENESS,137,757,72,21,8,3,2,4,0,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+1,86,85,57,0,2,0,0,0,64,0,-1--1--1,,1|(276,741)|
+10,87,Cost,1110,771,19,12,8,3,0,0,-1,0,0,0
+10,88,sigma switch from platform,864,792,66,21,8,3,0,0,0,0,0,0
+10,89,sigma switch use,841,752,48,21,8,3,0,0,0,0,0,0
+10,90,Cost use,1223,666,34,12,8,3,0,0,-1,0,0,0
+10,91,REF COST,916,679,43,12,8,3,2,4,0,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+10,92,REF PERFORMANCE,980,596,67,21,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+10,93,a long,1045,673,24,12,8,3,0,0,-1,0,0,0
+1,94,93,88,0,0,0,0,1,64,0,0-0-0,|10||0-0-0,1|(966,724)|
+10,95,ALPHA,920,647,29,12,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+1,96,95,93,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(978,659)|
+10,97,a short,1144,728,26,12,8,3,0,0,0,0,0,0
+1,98,87,93,0,0,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1081,727)|
+1,99,92,93,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1010,633)|
+1,100,91,93,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(983,675)|
+1,101,95,97,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1026,685)|
+1,102,90,97,0,0,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1189,692)|
+1,103,92,97,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1062,662)|
+10,104,REF USE COST,985,705,38,21,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+1,105,104,97,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1063,715)|
+1,106,97,89,0,0,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1010,738)|
+10,107,exogenous infra,1053,311,59,12,8,3,0,0,0,0,0,0
+10,108,DELAY INFRA CONSTRUCTION,934,221,70,21,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+1,109,108,107,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(993,266)|
+10,110,new infra,1157,288,34,12,8,3,0,0,-1,0,0,0
+1,111,110,107,0,0,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1121,295)|
+10,112,POLICY ELECTRIC INFRA,1122,224,72,21,8,3,2,4,-1,0,0,0,-1--1--1,128-192-255,|8||0-0-0
+1,113,112,110,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1138,254)|
+10,114,POLICY PUBLIC INFRA,1275,254,66,21,8,131,2,4,-1,0,0,0,-1--1--1,128-192-255,|8||0-0-0
+1,115,114,110,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1206,273)|
+10,116,exo infra init,899,290,44,12,8,3,0,4,-1,0,0,0,-1--1--1,255-255-128,|10||0-0-0
+1,117,116,107,0,0,0,0,1,64,0,0-0-0,|10||0-0-0,1|(961,298)|
+10,118,initial car ownership fraction0,894,864,68,21,8,3,0,0,-1,0,0,0
+10,119,initial ownership fraction,989,913,59,21,8,3,0,0,-1,0,0,0
+10,120,lambda,743,836,37,12,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|8||128-128-128
+1,121,120,118,0,0,0,0,1,64,0,0-0-0,|10||0-0-0,1|(796,845)|
+1,122,88,118,0,0,0,0,1,64,0,0-0-0,|10||0-0-0,1|(875,821)|
+10,123,POLICY ELECTRIC COST SUBSIDY,1111,824,77,21,8,3,2,4,0,0,0,0,-1--1--1,128-192-255,|8||0-0-0
+10,124,POLICY PUBLIC COST SUBSIDY,1257,621,66,21,8,3,2,4,0,0,0,0,-1--1--1,128-192-255,|8||0-0-0
+1,125,124,90,0,2,0,0,0,64,0,-1--1--1,,1|(1241,642)|
+10,126,DELAY BIOFUEL,1502,887,37,21,8,3,2,4,-1,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+10,127,POLICY BIOFUEL CAPACITY,1540,783,71,21,8,3,2,4,-1,0,0,0,-1--1--1,128-192-255,|8||0-0-0
+10,128,OIL PRICE GROWTH RATE,1430,719,64,21,8,3,2,4,0,0,0,0,-1--1--1,255-255-128,|8||0-0-0
+10,129,Oil price index,1380,778,47,22,3,131,0,0,0,0,0,0
+1,130,128,129,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1410,742)|
+10,131,PriceIndex,1277,801,40,12,8,3,0,0,0,0,0,0
+1,132,129,131,0,0,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1331,788)|
+10,133,Biofuel Availability,1410,835,39,21,8,131,0,0,0,0,0,0
+1,134,126,133,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1461,865)|
+1,135,127,133,0,2,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1475,808)|
+1,136,133,131,0,0,0,0,1,64,0,0-0-0,|10||0-0-0,1|(1350,820)|
+1,137,131,90,1,0,0,0,0,64,0,-1--1--1,,1|(1303,736)|
+1,138,123,87,0,2,0,0,0,64,0,-1--1--1,,1|(1110,799)|
+10,139,Biofuel price index,1313,857,46,21,8,3,0,0,-1,0,0,0
+1,140,139,131,0,0,0,0,0,64,0,-1--1--1,,1|(1295,830)|
+1,141,52,14,0,2,0,0,0,64,0,-1--1--1,,1|(401,435)|
+1,142,107,9,1,0,0,0,0,64,0,-1--1--1,,1|(1112,396)|
+1,143,28,9,0,0,0,0,0,64,0,-1--1--1,,1|(1017,470)|
+1,144,8,97,0,0,0,0,0,64,0,-1--1--1,,1|(1121,648)|
+1,145,8,93,0,0,0,0,0,64,0,-1--1--1,,1|(1077,622)|
+1,146,22,66,0,2,0,0,0,64,0,-1--1--1,,1|(570,862)|
+1,147,21,66,0,0,0,0,0,64,0,-1--1--1,,1|(642,856)|
+1,148,1,62,0,0,0,0,0,64,0,-1--1--1,,1|(550,631)|
+1,149,53,89,0,0,0,0,0,64,0,-1--1--1,,1|(695,769)|
+1,150,53,88,0,0,0,0,0,64,0,-1--1--1,,1|(697,787)|
+10,151,Policy Time Cost,1226,751,43,21,8,131,0,4,-1,0,0,0,-1--1--1,192-255-255,|10||0-0-0
+10,152,Time,705,587,29,12,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,153,152,34,0,0,0,0,0,64,0,-1--1--1,,1|(723,552)|
+10,154,Time,1173,330,29,12,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,155,154,110,0,0,0,0,0,64,0,-1--1--1,,1|(1167,315)|
+1,156,151,90,0,0,0,0,0,64,0,-1--1--1,,1|(1224,710)|
+10,157,Time,1248,703,29,12,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,158,157,90,0,0,0,0,0,64,0,-1--1--1,,1|(1239,690)|
+10,159,Time,1110,802,29,12,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,160,159,87,0,0,0,0,0,64,0,-1--1--1,,1|(1110,793)|
+10,161,Time,1461,866,29,12,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,162,161,133,0,0,0,0,0,64,0,-1--1--1,,1|(1448,858)|
+10,163,Policy Time infra,140,653,60,12,8,3,0,4,-1,0,0,0,-1--1--1,192-255-255,|10||0-0-0
+1,164,151,87,0,0,0,0,0,64,0,-1--1--1,,1|(1162,761)|
+10,165,Policy Time infra,1358,913,48,21,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,166,165,133,0,0,0,0,0,64,0,-1--1--1,,1|(1380,879)|
+10,167,Policy Time infra,1284,328,48,21,8,130,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,168,167,110,0,0,0,0,0,64,0,-1--1--1,,1|(1220,307)|
+10,169,Policy Time infra,732,636,48,21,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,170,169,34,0,0,0,0,0,64,0,-1--1--1,,1|(740,572)|
+10,171,Policy Time marketing,266,804,43,21,8,3,0,4,-1,0,0,0,-1--1--1,192-255-255,|10||0-0-0
+1,172,171,57,0,0,0,0,0,64,0,-1--1--1,,1|(331,765)|
+10,173,INITIAL TIME,99,407,35,21,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,174,119,14,0,17,0,0,0,64,1,-1--1--1,,1|(729,684)|
+10,175,initial population,23,340,44,21,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,176,175,14,0,0,0,0,0,64,1,-1--1--1,,1|(237,392)|
+1,177,173,57,1,0,0,0,0,64,0,-1--1--1,,1|(228,582)|
+1,178,88,14,0,0,0,0,0,64,0,-1--1--1,,1|(667,624)|
+1,179,89,12,0,0,0,0,0,64,0,-1--1--1,,1|(705,601)|
+12,180,1772406,226,149,236,154,3,188,0,0,2,0,0,0
+Trip Fraction[x],Graph
+12,181,1903406,646,151,174,155,3,188,0,0,2,0,0,0
+Owner Fraction[x],Graph
+10,182,Possibility to use,705,711,46,21,8,3,0,0,-1,0,0,0
+1,183,182,89,0,0,0,0,0,64,0,-1--1--1,,1|(765,728)|
+1,184,30,118,0,0,0,0,0,64,0,-1--1--1,,1|(852,609)|
+1,185,22,118,0,0,0,0,0,64,0,-1--1--1,,1|(727,875)|
+10,186,DELAY INFRA CONSTRUCTION,56,482,74,21,8,2,0,3,-1,0,0,0,128-128-128,0-0-0,|10||128-128-128
+1,187,116,38,0,0,0,0,0,64,0,-1--1--1,,1|(1036,371)|
+1,188,30,38,0,0,0,0,0,64,0,-1--1--1,,1|(1021,417)|
+10,189,initial car ownership fraction,805,952,72,21,8,3,0,0,-1,0,0,0
+1,190,189,119,0,0,0,0,0,64,0,-1--1--1,,1|(896,932)|
+///---\\\
+:L<%^E!@
+1:testi.vdf
+1:electric biofuel.vdf
+1:electric no roads.vdf
+1:electric public.vdf
+1:public.vdf
+1:electric.vdf
+1:electric short.vdf
+1:baseline.vdf
+9:testi
+22:$,Dollar,Dollars,$s
+22:Day,Days
+22:Hour,Hours
+22:Month,Months
+22:Person,People,Persons
+22:Stores,Store
+22:Trip,Trips
+22:Unit,Units
+22:Week,Weeks
+22:Year,Years
+18:C:\Data\a\TFSC\2014 TFSCrev2b\sensitivity\extremeconditions.vsc
+20:export save list.lst
+15:0,0,0,0,0,0
+19:85,0
+27:2,
+34:0,
+4:Time
+5:POLICY PUBLIC COST SUBSIDY
+35:Date
+36:YYYY-MM-DD
+37:2000
+38:1
+39:1
+40:0
+41:0
+42:0
+24:2010
+25:2050
+26:2050
+6:public transport
